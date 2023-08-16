@@ -1,7 +1,7 @@
 import * as kafka from 'kafka-node'
-import { getConfig } from '@root/config/index'
+import { getMiddleWareConfig } from '@/config/middleware.config'
 
-const { kafkaConfig } = getConfig()
+const { kafkaConfig } = getMiddleWareConfig()
 
 let kafkaConsumer!: kafka.Consumer
 
@@ -20,7 +20,7 @@ function getKafkaClient() {
 }
 
 /**
- * @desc 初始化Topic
+ * @desc initialize kafka topic
  */
 export function initKafkaTopic(): Promise<any> {
   const kafkaClient = getKafkaClient()()
@@ -56,7 +56,7 @@ export function initKafkaTopic(): Promise<any> {
 }
 
 /**
- * @desc 获取消费者实例
+ * @desc Get consumer instance
  */
 export function getKafkaConsumer() {
   const topics = [
@@ -68,10 +68,10 @@ export function getKafkaConsumer() {
   ]
 
   const options = {
-    //  自动提交配置   (false 不会提交偏移量，每次都从头开始读取)
+    //  Auto commit configuration 
     autoCommit: true,
     autoCommitIntervalMs: 5000,
-    //  如果设置为true，则consumer将从有效负载中的给定偏移量中获取消息
+    //  if set to true, the consumer will fetch messages from the given offset within the payload.
     fromOffset: false,
   }
 

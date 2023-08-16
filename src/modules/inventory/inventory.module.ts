@@ -1,30 +1,31 @@
 import { Logger, Module, OnApplicationBootstrap } from '@nestjs/common'
 import * as Redis from 'ioredis'
-import { awaitWrap } from '@/utils'
+import { awaitWrap } from '@/modules/middleware/utils'
 import { CreateOrderDTO } from '../order/order.dto'
 import { OrderModule } from '../order/order.module'
 import { OrderService } from '../order/order.service'
-import { RedisClientService } from '../redis/redis.service'
-import { getKafkaConsumer } from './kafka-utils'
-import { SeckillController } from './seckill.controller'
-import { SeckillService } from './seckill.service'
+import { RedisClientService } from '../middleware/redis.service'
+import { getKafkaConsumer } from '../middleware/kafka-utils'
+import { InventoryController } from './inventory.controller'
+import { InventoryService } from './inventory.service'
+
 @Module({
   imports: [OrderModule],
-  providers: [RedisClientService, SeckillService],
-  controllers: [SeckillController],
+  providers: [RedisClientService, InventoryService],
+  controllers: [InventoryController],
 })
-export class SeckillModule implements OnApplicationBootstrap {
-  logger = new Logger('SeckillModule')
+export class InventoryModule implements OnApplicationBootstrap {
+  logger = new Logger('Inventory Module')
 
-  seckillRedisClient!: Redis.Redis
+  inventoryRedisClient!: Redis.Redis
 
   constructor(
     private readonly orderService: OrderService,
-    private readonly seckillService: SeckillService,
+    private readonly inventoryService: InventoryService,
     private readonly redisClientService: RedisClientService
   ) {
-    this.redisClientService.getSeckillRedisClient().then(client => {
-      this.seckillRedisClient = client
+    this.redisClientService.getInventoryRedisClient().then(client => {
+      this.inventoryRedisClient = client
     })
   }
 
@@ -32,7 +33,7 @@ export class SeckillModule implements OnApplicationBootstrap {
     const kafkaConsumer = getKafkaConsumer()
 
     kafkaConsumer.on('message', async message => {
-      this.logger.log('得到的生产者的数据为：')
+      this.logger.log('Data from producer：')
       this.logger.verbose(message)
 
       let value!: CreateOrderDTO
@@ -44,18 +45,18 @@ export class SeckillModule implements OnApplicationBootstrap {
       }
       value.kafkaRawMessage = JSON.stringify(message)
 
-      const [err, order] = await awaitWrap(this.orderService.saveOne(value))
+      const [err, order] = await awaitWrap(this.orderService.createOrder(value))
       if (err) {
         this.logger.error(err)
         return
       }
-      this.logger.log(`订单【${order.id}】信息已存入数据库`)
+      this.logger.log(`Orer${order.id} information has been put into database`)
     })
   }
 
   async onApplicationBootstrap() {
     this.logger.log('onApplicationBootstrap: ')
-    await this.seckillService.initCount()
+    await this.inventoryService.initCount()
     // await initKafkaTopic();
     this.handleListenerKafkaMessage()
   }

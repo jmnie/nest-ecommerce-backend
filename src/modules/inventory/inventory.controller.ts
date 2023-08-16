@@ -1,24 +1,24 @@
 import { Body, Controller, Logger, Post, Put } from '@nestjs/common'
 import { CreateOrderDTO } from '../order/order.dto'
-import { SeckillService } from './seckill.service'
+import { InventoryService } from './inventory.service'
 import * as uuid from 'uuid-random'
-import { awaitWrap } from '@/utils/index'
+import { awaitWrap } from '@/modules/middleware/utils'
 import { ApiBody } from '@nestjs/swagger'
 
-@Controller('seckill')
-export class SeckillController {
-  logger = new Logger('SeckillController')
+@Controller('inventory')
+export class InventoryController {
+  logger = new Logger('Inventory Controller')
 
-  constructor(private readonly seckillService: SeckillService) {}
+  constructor(private readonly inventoryService: InventoryService) {}
 
-  @Post('/add')
+  @Post('/add_order')
   async addOrder(@Body() order: CreateOrderDTO) {
     const params: CreateOrderDTO = {
       ...order,
       openid: `${uuid()}-${new Date().valueOf()}`,
     }
 
-    const [error, result] = await awaitWrap(this.seckillService.secKill(params))
+    const [error, result] = await awaitWrap(this.inventoryService.queryOrder(params))
 
     return error || result
   }
@@ -32,8 +32,8 @@ export class SeckillController {
   async resetOrderRemain(@Body() config: any) {
     const remainCount = config?.count || 0
 
-    if (remainCount < 0) return '剩余数量不可小于0！'
+    if (remainCount < 0) return 'Remaining Count cannot be 0！'
 
-    return this.seckillService.setRemainCount(remainCount)
+    return this.inventoryService.setRemainCount(remainCount)
   }
 }

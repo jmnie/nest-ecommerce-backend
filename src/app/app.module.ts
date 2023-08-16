@@ -1,30 +1,29 @@
 import { CacheModule, Module } from '@nestjs/common'
 import { RedisModule } from 'nestjs-redis'
-import { join } from 'path'
 import * as redisStore from 'cache-manager-redis-store'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { TypeOrmModule } from '@nestjs/typeorm'
-import { getConfig } from '../config/index'
-import { OrderModule } from './order/order.module'
-import { SeckillService } from './seckill/seckill.service'
-import { SeckillModule } from './seckill/seckill.module'
-import { RedisClientService } from './redis/redis.service'
+import { getMiddleWareConfig } from '../config/middleware.config'
+import { OrderModule } from '@/modules/order/order.module'
+import { InventoryService } from '@/modules/inventory/inventory.service'
+import { InventoryModule } from '@/modules/inventory/inventory.module'
+import { RedisClientService } from '@/modules/middleware/redis.service'
+import { WeChatAPIModule } from '@/modules/wechatAPI/wechatAPI.module'
+import { SupportedDatabaseType, getDatabaseTypeFromConfig } from '@/modules/middleware/utils'
 
-const { database, redisCache, redisSeckill } = getConfig()
+const { database, redisCache, redisConfig } = getMiddleWareConfig()
 
-const entities = process.env.NODE_ENV === 'production' ? ['*.entity.js'] : [join(__dirname, '**', '*.entity.{ts,js}')]
+const dataBaseType: SupportedDatabaseType = getDatabaseTypeFromConfig(database.type); 
 
 const TypeOrmModuleInstance = TypeOrmModule.forRoot({
-  type: 'mysql',
+  type: dataBaseType,
   host: database.ip,
   port: database.port,
   username: database.username,
   password: database.password,
   database: database.database,
-  entities: entities,
-  synchronize: process.env.NODE_ENV !== 'production',
-  //nest属性
+  //synchronize: process.env.NODE_ENV !== 'production',
   autoLoadEntities: true,
   retryAttempts: 3,
   cache: {
@@ -47,12 +46,13 @@ const TypeOrmModuleInstance = TypeOrmModule.forRoot({
       ttl: 10, // seconds
       max: 999, // maximum number of items in cache
     }),
-    //redis-io连接配置,用于手动操作redis
-    RedisModule.register([redisSeckill]),
+    //redis-io connection 
+    RedisModule.register([redisConfig]),
     OrderModule,
-    SeckillModule,
+    InventoryModule,
+    WeChatAPIModule
   ],
   controllers: [AppController],
-  providers: [AppService, SeckillService, RedisClientService],
+  providers: [AppService, InventoryService, RedisClientService],
 })
 export class AppModule {}

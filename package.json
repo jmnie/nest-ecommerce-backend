@@ -1,25 +1,16 @@
 {
-  "name": "nest-seckill",
+  "name": "E-commerce Backend System",
   "version": "0.1.0",
-  "description": "node+redis+kafka秒杀系统",
-  "author": "lzb1175808746@gmail.com",
-  "private": true,
-  "license": "MIT",
+  "description": "On Running Case Study",
+  "author": "Jiaming Nie, jiaming.nie13@gmail.com",
   "scripts": {
-    "prebuild": "rimraf dist",
-    "dev": "nest start --watch",
-    "build": "cross-env NODE_ENV=production nest build",
-    "start:debug": "nest start --debug --watch",
-    "prod": "node dist/src/main.js",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "lint": "eslint \"{src,apps,libs,config,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "build": "nest build",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "test:e2e": "jest --forceExit --config ./test/jest-e2e.json --runInBand"
   },
   "dependencies": {
+    "@nestjs/axios": "^3.0.0",
     "@nestjs/common": "^7.5.1",
     "@nestjs/core": "^7.5.1",
     "@nestjs/platform-express": "^7.5.1",

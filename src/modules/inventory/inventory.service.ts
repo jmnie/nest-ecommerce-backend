@@ -2,11 +2,11 @@ import { Injectable, Logger } from '@nestjs/common'
 import * as kafka from 'kafka-node'
 import * as Redis from 'ioredis'
 import { set } from 'lodash'
-import { RedisClientService } from '../redis/redis.service'
-import { getConfig } from '@root/config/index'
-import { awaitWrap } from '@/utils'
+import { RedisClientService } from '../middleware/redis.service'
+import { getMiddleWareConfig } from '@/config/middleware.config'
+import { awaitWrap } from '@/modules/middleware/utils'
 
-const { redisSeckill, kafkaConfig } = getConfig()
+const { redisConfig, kafkaConfig } = getMiddleWareConfig()
 
 const Producer = kafka.Producer
 const kafkaClient = new kafka.KafkaClient({ kafkaHost: kafkaConfig.kafkaHost })
@@ -20,58 +20,56 @@ const producer = new Producer(kafkaClient, {
 })
 
 @Injectable()
-export class SeckillService {
-  logger = new Logger('SeckillService')
+export class InventoryService {
+  logger = new Logger('Inventory Service Started')
 
-  seckillRedisClient!: Redis.Redis
+  inventoryRedisClient!: Redis.Redis
 
   count = 0
 
   constructor(private readonly redisClientService: RedisClientService) {
-    this.redisClientService.getSeckillRedisClient().then(client => {
-      this.seckillRedisClient = client
+    this.redisClientService.getInventoryRedisClient().then(client => {
+      this.inventoryRedisClient = client
     })
   }
 
   async initCount() {
-    const { seckillCounterKey } = redisSeckill
+    const { counterKey } = redisConfig
 
-    return await this.seckillRedisClient.set(seckillCounterKey, 100)
+    return await this.inventoryRedisClient.set(counterKey, 100)
   }
 
-  async secKill(params) {
-    const { seckillCounterKey } = redisSeckill
+  async queryOrder(params) {
+    const { counterKey } = redisConfig
 
-    this.logger.log(`当前请求count：${this.count++}`)
+    this.logger.log(`Current Request Count：${this.count++}`)
 
-    //TIPS:使用乐观锁解决高并发
-    const [watchError] = await awaitWrap(this.seckillRedisClient.watch(seckillCounterKey)) //监听counter字段
+    // Using optimistic locking to address high concurrency.
+    const [watchError] = await awaitWrap(this.inventoryRedisClient.watch(counterKey)) //Listen to counter field
     watchError && this.logger.error(watchError)
     if (watchError) return watchError
 
-    const [getError, reply] = await awaitWrap(this.seckillRedisClient.get(seckillCounterKey))
+    const [getError, reply] = await awaitWrap(this.inventoryRedisClient.get(counterKey))
     getError && this.logger.error(getError)
     if (getError) return getError
 
     if (parseInt(reply) <= 0) {
-      this.logger.warn('已经卖光了')
-      return '已经卖光了'
+      this.logger.warn('Already sold out. Remaining Count decreased to 0')
+      return 'Alreay Sold out'
     }
 
-    //更新redis的counter数量减一
-    const [execError, replies] = await awaitWrap(this.seckillRedisClient.multi().decr(seckillCounterKey).exec())
+    //Update Redis Counter
+    const [execError, replies] = await awaitWrap(this.inventoryRedisClient.multi().decr(counterKey).exec())
     execError && this.logger.error(execError)
     if (execError) return execError
 
-    //counter字段正在操作中，等待counter被其他释放
+    //Counter is in use, wait to be free
     if (!replies) {
-      this.logger.warn('counter被使用')
-      this.secKill(params)
+      this.logger.warn('counter is in use')
+      this.queryOrder(params)
       return
     }
 
-    // this.logger.log('replies: ')
-    // this.logger.verbose(replies)
     set(params, 'remainCount', replies[0]?.[1])
 
     const payload = [
@@ -82,7 +80,7 @@ export class SeckillService {
       },
     ]
 
-    this.logger.log('生产数据payload:')
+    this.logger.log('Producer Payload:')
     this.logger.verbose(payload)
 
     return new Promise((resolve, reject) => {
@@ -99,27 +97,26 @@ export class SeckillService {
     })
   }
 
-  // 设置剩余库存
+  // Set Remaining Count
   async setRemainCount(remainCount: number) {
-    const { seckillCounterKey } = redisSeckill
+    const { counterKey } = redisConfig
 
-    //TIPS:使用乐观锁解决高并发
-    const [watchError] = await awaitWrap(this.seckillRedisClient.watch(seckillCounterKey)) //监听counter字段
+    const [watchError] = await awaitWrap(this.inventoryRedisClient.watch(counterKey)) //Listening to counter
     watchError && this.logger.error(watchError)
     if (watchError) return watchError
 
-    //更新redis的counter数量
-    const [execError, replies] = await awaitWrap(this.seckillRedisClient.multi().set(seckillCounterKey, remainCount).get(seckillCounterKey).exec())
+    //Update number in counter
+    const [execError, replies] = await awaitWrap(this.inventoryRedisClient.multi().set(counterKey, remainCount).get(counterKey).exec())
     execError && this.logger.error(execError)
     if (execError) return execError
 
-    //counter字段正在操作中，等待counter被其他释放
+    //Counter is in use
     if (!replies) {
-      this.logger.warn('counter被使用')
+      this.logger.warn('Counter is currently in use')
       return this.setRemainCount(remainCount)
     }
 
     console.log('replies: ', replies)
-    return `更新剩余商品数成功！现在剩余：${replies?.[1]?.[1]}`
+    return `Product amount updated. Remaining Count：${replies?.[1]?.[1]}`
   }
 }

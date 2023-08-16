@@ -18,27 +18,27 @@ export class OrderService {
     return this.orderRepository.find(options)
   }
 
-  async saveOne(order: Partial<Order>) {
+  async createOrder(order: Partial<Order>) {
     await this.orderConnection.queryResultCache.clear()
     return this.orderRepository.save(order)
   }
 
-  async updateOne(orderId: number | string, order: Partial<Order>) {
+  async updateOrderById(orderId: string, order: Partial<Order>) {
     await this.orderConnection.queryResultCache.clear()
     return this.orderRepository.update(orderId, order)
   }
 
-  findOneById(id: string | number) {
-    return this.orderRepository.findOne(id, { cache: true })
+  getOrderById(orderId: string) {
+    return this.orderRepository.findOne(orderId, { cache: true })
   }
 
-  async deleteById(id: number) {
+  async deleteOrderById(id: string) {
     await this.orderConnection.queryResultCache.clear()
     return this.orderRepository.delete(id)
   }
 
-  async deleteByIds(ids: string[]) {
+  async deleteOrderByIds(orderIds: string[]) {
     await this.orderConnection.queryResultCache.clear()
-    return this.orderRepository.delete(ids)
+    return this.orderRepository.delete(orderIds)
   }
 }
